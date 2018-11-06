@@ -134,6 +134,8 @@ def translate_image(uncorrected_image, translational_offset):
 import tifffile as tf
 import tkinter as tk
 import tkinter.filedialog as dia
+import skimage.io as io
+from skimage.util import img_as_uint
 
 def align_images():
 
@@ -141,6 +143,11 @@ def align_images():
     root = tk.Tk()
     images_fns = dia.askopenfilenames(parent=root,
                                       title='Choose the images you would like to align')
+    root.destroy()
+    # ask the user where they would like to save the output stacks
+    root = tk.Tk()
+    save_path = dia.askdirectory(parent=root,
+                            title='Choose the directory where you want to save your output stacks')
     root.destroy()
 
     # create a list of image objects (np arrays) that will be aligned
@@ -150,7 +157,11 @@ def align_images():
 
     # create a list of offsets using _determine_rotation_offset()
     rotational_offsets = []
+    # create an index variable to print so the user can see progress
+    index = 0
     for image in images:
+        index = index + 1
+        print("Determining rotation offset %d of %d" % (index, len(images)))
         vis_channel = image[0]
         rotational_offsets.append(_determine_rotation_offset(vis_channel))
 
@@ -158,19 +169,26 @@ def align_images():
     rotated_vis_images = []
     rotated_yfp_images = []
     rotated_dsred_images = []
+
+    index = 0 # again, progress bar index
     for i in range(0, len(images)):
 
         vis_channel = images[i][0]
         yfp_channel = images[i][1]
         dsred_channel = images[i][2]
 
+        index = index + 1
+        print("Rotating image %d of %d" % (index, len(images)))
         rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i]))
         rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i]))
         rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i]))
 
-    # create list of translational offsets
+    # create list of translational offsets and define a progress bar index
+    index = 0
     translational_offsets = []
     for image in rotated_vis_images:
+        index  = index + 1
+        print("Determining registration offset %d of %d" % (index, len(images)))
         translational_offsets.append(_determine_registration_offset(rotated_vis_images[0], image))
 
     # create a list of translationally aligned images translated according to the translational_offsets list
@@ -178,29 +196,26 @@ def align_images():
     translated_yfp_images = []
     translated_dsred_images = []
 
+    index = 0
     for i in range(0, len(translational_offsets)):
+        index = index + 1
+        print("Translating image %d of %d" % (index, len(images)))
         translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i]))
         translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i]))
         translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i]))
 
-    return (translated_vis_images, translated_yfp_images, translated_dsred_images)
+    return (translated_vis_images, translated_yfp_images, translated_dsred_images, save_path)
 
-import skimage.io as io
-from skimage.util import img_as_uint
-import tifffile as tf
-
-def save_stacks(vis, yfp, dsred):
-    
-    root = tk.Tk()
-    path = dia.askdirectory(parent=root,
-                            title='Choose the directory where you want to save your images')
-    root.destroy()
+def save_stacks(vis, yfp, dsred, save_path):
     
     vis_con = io.concatenate_images(img_as_uint(vis))
-    tf.imsave(path + '/vis_stack.tif', vis_con)
+    tf.imsave(save_path + '/bf_stack.tif', vis_con)
+    print("BF stack saved")
 
     yfp_con = io.concatenate_images(img_as_uint(yfp))
-    tf.imsave(path + '/yfp_stack.tif', yfp_con)
+    tf.imsave(save_path + '/yfp_stack.tif', yfp_con)
+    print("YFP stack saved")
 
     dsred_con = io.concatenate_images(img_as_uint(dsred))
-    tf.imsave(path + '/dsred_stack.tif', dsred_con)
+    tf.imsave(save_path + '/dsred_stack.tif', dsred_con)
+    print("DsRed stack saved")
