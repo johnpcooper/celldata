@@ -1,14 +1,15 @@
 import roi_management as rm
 
 def run():
-	# create the cropped stack object
-	cropped_stack = rm.run(1)
-	# resize the cropped stack and save it in the current working
-	# directory as "test_stack.tif"
-	resized_stack = rm.run_resize(cropped_stack, "test_stack")
+	
+	cs = rm.Cell_Stacks()
 
-if __name__ == '__main__':
+	cropped_dsred_stacks, cropped_yfp_stacks, cropped_bf_stacks = cs.set_cropped_cells_lists(cs.cells_dfs)
+	resized_dsred_stacks, resized_yfp_stacks, resized_bf_stacks = cs.set_resized_cells_lists(cropped_dsred_stacks, cropped_yfp_stacks, cropped_bf_stacks, cs.cells_dfs)
+	cs.save_resized_stacks(resized_dsred_stacks, resized_yfp_stacks, resized_bf_stacks, cs.cells_dfs)
+	otsu_thresh_dsred_stacks = cs.set_otsu_thresholded_cells_lists(resized_dsred_stacks, cs.cells_dfs)
+
+if __name__ == "__main__":
 	run()
 
-else:
-	print("system error")
+
