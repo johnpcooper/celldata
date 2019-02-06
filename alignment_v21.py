@@ -175,15 +175,15 @@ def align_images(fov_path):
         # if that's the case, use the rotational offset from 10 images ago.
         if rotational_offsets[i] != 0.0:
 
-	        rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i]))
-	        rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i]))
-	        rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i]))
+            rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i]))
+            rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i]))
+            rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i]))
 
         elif rotational_offsets[i] == 0.0:
-        	print("Rotational alignment failed for image %s, using rotation offset from image %s" % (i, i-10))
-	        rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i-10]))
-	        rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i-10]))
-	        rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i-10]))
+            print("Rotational alignment failed for image %s, using rotation offset from image %s" % (i, i-10))
+            rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i-10]))
+            rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i-10]))
+            rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i-10]))
 
     # create list of translational offsets and define a progress bar index
     index = 0
@@ -205,25 +205,25 @@ def align_images(fov_path):
 
         # check whether the translational offset that was determined above is going to shift the image out of frame
         # if it does cause a shift out of frame, just use the previous translational offset
-    	x_offset = translational_offsets[i][1]
-    	y_offset = translational_offsets[i][0]
+        x_offset = translational_offsets[i][1]
+        y_offset = translational_offsets[i][0]
 
-    	offset_magnitude = np.sqrt(np.power(x_offset, 2) + np.power(y_offset, 2))
+        offset_magnitude = np.sqrt(np.power(x_offset, 2) + np.power(y_offset, 2))
 
-    	# this would be buggy if there are multiple bad alignments in a row and I use i-1. So arbitrarily I'm 
-    	# saying go 10 images back. It would be useful to add scanning functionality so I can go back
-    	# and find the last sub 20 pixel offset_magnitude
+        # this would be buggy if there are multiple bad alignments in a row and I use i-1. So arbitrarily I'm 
+        # saying go 10 images back. It would be useful to add scanning functionality so I can go back
+        # and find the last sub 20 pixel offset_magnitude
         if offset_magnitude <= 20:
 
-	        translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i]))
-	        translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i]))
-	        translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i]))
+            translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i]))
+            translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i]))
+            translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i]))
 
         elif offset_magnitude >= 20:
-        	print("Registration for image %s failed, using translational_offset from image %s" % (i, i-10))
-	        translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i-10]))
-	        translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i-10]))
-	        translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i-10]))
+            print("Registration for image %s failed, using translational_offset from image %s" % (i, i-10))
+            translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i-10]))
+            translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i-10]))
+            translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i-10]))
 
     return (translated_vis_images, translated_yfp_images, translated_dsred_images)
 
