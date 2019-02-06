@@ -178,12 +178,15 @@ def align_images(fov_path):
             rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i]))
             rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i]))
             rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i]))
+            
+            last_good_rotational_offset_index = i
+            last_good_rotational_offset = rotational_offsets[i]
 
         elif rotational_offsets[i] == 0.0:
-            print("Rotational alignment failed for image %s, using rotation offset from image %s" % (i, i-10))
-            rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i-10]))
-            rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i-10]))
-            rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i-10]))
+            print("Rotational alignment failed for image %s, using rotation offset from image %s" % (i, last_good_rotational_offset_index))
+            rotated_vis_images.append(rotate_image(vis_channel, last_good_rotational_offset))
+            rotated_yfp_images.append(rotate_image(yfp_channel, last_good_rotational_offset))
+            rotated_dsred_images.append(rotate_image(dsred_channel, last_good_rotational_offset))
 
     # create list of translational offsets and define a progress bar index
     index = 0
@@ -213,17 +216,20 @@ def align_images(fov_path):
         # this would be buggy if there are multiple bad alignments in a row and I use i-1. So arbitrarily I'm 
         # saying go 10 images back. It would be useful to add scanning functionality so I can go back
         # and find the last sub 20 pixel offset_magnitude
-        if offset_magnitude <= 20:
+        if y_offset < 20:
 
             translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i]))
             translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i]))
             translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i]))
+            
+            last_good_translational_offset_index = i
+            last_good_translational_offset = translational_offsets[i]
 
-        elif offset_magnitude >= 20:
-            print("Registration for image %s failed, using translational_offset from image %s" % (i, i-10))
-            translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i-10]))
-            translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i-10]))
-            translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i-10]))
+        elif y_offset >= 20:
+            print("Registration for image %s failed, using translational_offset from image %s" % (i, last_good_translational_offset_index))
+            translated_vis_images.append(translate_image(rotated_vis_images[i], last_good_translational_offset))
+            translated_yfp_images.append(translate_image(rotated_yfp_images[i], last_good_translational_offset))
+            translated_dsred_images.append(translate_image(rotated_dsred_images[i], last_good_translational_offset))
 
     return (translated_vis_images, translated_yfp_images, translated_dsred_images)
 
