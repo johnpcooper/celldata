@@ -1,12 +1,25 @@
 from skimage.filters import rank, threshold_otsu, sobel_v
 from skimage.morphology import disk, remove_small_objects
-from scipy import ndimage
-import time
 from skimage import transform
 from skimage.morphology import skeletonize
+from skimage.feature import register_translation
+from skimage.feature.register_translation import _upsampled_dft
+from skimage.transform import AffineTransform
+import skimage.io as io
+from skimage.util import img_as_uint
+
+from scipy import ndimage
 import numpy as np
+
+import time
 import math
 import logging
+import os
+import logging
+import tifffile as tf
+import tkinter as tk
+import tkinter.filedialog as dia
+
 
 log = logging.getLogger(__name__)
 
@@ -87,11 +100,6 @@ def rotate_image(image, offset):
     
     return transform.rotate(image, offset)
 
-import logging
-from skimage.feature import register_translation
-from skimage.feature.register_translation import _upsampled_dft
-from skimage.transform import AffineTransform
-
 # from fylm/service/registration.py
 def _determine_registration_offset(base_image, uncorrected_image):
     """
@@ -131,29 +139,35 @@ def translate_image(uncorrected_image, translational_offset):
     new_image = transform.warp(uncorrected_image, transform.AffineTransform(translation=(-x, -y)))
     return new_image
 
-import tifffile as tf
-import tkinter as tk
-import tkinter.filedialog as dia
-import skimage.io as io
-from skimage.util import img_as_uint
+def get_channel_names(fov_path):
 
-def align_images():
+    fov_slices_filenames = os.listdir(fov_path)
+    rep_image_filename = fov_slices_filenames[0]
+    rep_image = tf.imread(fov_path + '/%s' % rep_image_filename)
+    len_channels = len(rep_image)
 
-    # create a list of filenames for the images you want to align
-    root = tk.Tk()
-    images_fns = dia.askopenfilenames(parent=root,
-                                      title='Choose the images you would like to align')
-    root.destroy()
-    # ask the user where they would like to save the output stacks
-    root = tk.Tk()
-    save_path = dia.askdirectory(parent=root,
-                            title='Choose the directory where you want to save your output stacks')
-    root.destroy()
+    print("Detected {} channels".format(len_channels))
+    print("Enter names below:")
 
-    # create a list of image objects (np arrays) that will be aligned
-    images = []    
-    for fn in images_fns:
-        images.append(tf.imread(fn))
+    channel_names = []
+    for i in range(0, len_channels):
+        channel_name = input("Name for channel {}: ".format(i))
+        channel_names.append(channel_name)
+
+    return len_channels, channel_names
+
+def align_images(fov_path, channel_names):
+
+    fov_slice_filenames = os.listdir(fov_path)
+
+    images = []
+    for filename in fov_slice_filenames:
+        image = tf.imread(fov_path + '/%s' % filename)
+        images.append(image)
+        print(filename)
+
+    # ascertain the number of channels in the image, assume that 
+    # channel 0 is brightfield
 
     # create a list of offsets using _determine_rotation_offset()
     rotational_offsets = []
@@ -166,56 +180,55 @@ def align_images():
         rotational_offsets.append(_determine_rotation_offset(vis_channel))
 
     # create a list of rotationally aligned images rotated according to the rotational_offsets list
-    rotated_vis_images = []
-    rotated_yfp_images = []
-    rotated_dsred_images = []
-
+    rotated_images = []
     index = 0 # again, progress bar index
     for i in range(0, len(images)):
+        channels_i = []
+        for j in range(0, len(images[0])):
+            channels_i.append(images[i][j])
 
-        vis_channel = images[i][0]
-        yfp_channel = images[i][1]
-        dsred_channel = images[i][2]
-
-        index = index + 1
+        index += 1
         print("Rotating image %d of %d" % (index, len(images)))
-        rotated_vis_images.append(rotate_image(vis_channel, rotational_offsets[i]))
-        rotated_yfp_images.append(rotate_image(yfp_channel, rotational_offsets[i]))
-        rotated_dsred_images.append(rotate_image(dsred_channel, rotational_offsets[i]))
-
-    # create list of translational offsets and define a progress bar index
+        rotated_channels_i = []
+        for j in range(0, len(channels_i)):
+            rotated_channels_i.append(rotate_image(channels_i[j], rotational_offsets[i]))
+            
+        rotated_images.append(rotated_channels_i)
+    
+    # calculate translational offsets
     index = 0
     translational_offsets = []
-    for image in rotated_vis_images:
-        index  = index + 1
+    for i in range(0, len(rotated_images)):
+        image = rotated_images[i][0]
+        index += 1
         print("Determining registration offset %d of %d" % (index, len(images)))
-        translational_offsets.append(_determine_registration_offset(rotated_vis_images[0], image))
-
-    # create a list of translationally aligned images translated according to the translational_offsets list
-    translated_vis_images = []
-    translated_yfp_images = []
-    translated_dsred_images = []
-
+        translational_offsets.append(_determine_registration_offset(rotated_images[0][0], image))
+        
+    # now translate the images
+    translated_images = []
     index = 0
     for i in range(0, len(translational_offsets)):
-        index = index + 1
+        index += 1
         print("Translating image %d of %d" % (index, len(images)))
-        translated_vis_images.append(translate_image(rotated_vis_images[i], translational_offsets[i]))
-        translated_yfp_images.append(translate_image(rotated_yfp_images[i], translational_offsets[i]))
-        translated_dsred_images.append(translate_image(rotated_dsred_images[i], translational_offsets[i]))
-
-    return (translated_vis_images, translated_yfp_images, translated_dsred_images, save_path)
-
-def save_stacks(vis, yfp, dsred, save_path):
+        
+        translated_channels_i = []
+        for j in range(0, len(images[0])):
+            translated_channels_i.append(translate_image(rotated_images[i][j], translational_offsets[i]))
+        translated_images.append(translated_channels_i)
     
-    vis_con = io.concatenate_images(img_as_uint(vis))
-    tf.imsave(save_path + '/bf_stack.tif', vis_con)
-    print("BF stack saved")
+    # make a dictionary to hold
+    keys = channel_names
+    values = []
+    for j in range(0, len(images[0])):        
+        values.append([translated_images[i][j] for i in range(0, len(translated_images))])
+        
+    translated_images_dict = dict(zip(keys, values))
 
-    yfp_con = io.concatenate_images(img_as_uint(yfp))
-    tf.imsave(save_path + '/yfp_stack.tif', yfp_con)
-    print("YFP stack saved")
+    return translated_images_dict
 
-    dsred_con = io.concatenate_images(img_as_uint(dsred))
-    tf.imsave(save_path + '/dsred_stack.tif', dsred_con)
-    print("DsRed stack saved")
+def save_stacks(translated_images_dict, save_path, fov_name):
+    print("Saving stacks...")
+    for channel, stack in translated_images_dict.items():
+        print("Saving {} stack".format(channel))
+        concat_stack = io.concatenate_images(img_as_uint(stack))
+        tf.imsave(save_path + '/{}_{}_stack.tif'.format(fov_name, channel), concat_stack)
